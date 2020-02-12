@@ -178,6 +178,59 @@ bool _parse_il_function_args(Arch& arch, vector<cst_t>& args, vector<int>& args_
     }
 }
 
+bool _parse_il_syscall_name( string& name, string& str, int& idx){
+    int i = idx;
+    string s = "";
+
+    _skip_whitespace(str, i);
+    
+    // Check if starts with sys_
+    if( str.size() - i < 4 )
+        return false;
+    if( str.substr(i, 4) != "sys_" ){
+        return false;
+    }else{
+        i += 4;
+    }
+    // Get name
+    while( i < str.size() && (isalpha(str[i]) || isdigit(str[i]))){
+        s += str[i++];
+    }
+    // Check and return
+    if( s.empty() )
+        return false; // No empty syscall name allowed
+    else{
+        name = s;
+        idx = i;
+        return true;
+    }
+}
+
+bool _parse_il_syscall_num( Arch& arch, int& num, string& str, int& idx){
+    int i = idx;
+    vector<cst_t> args;
+
+    _skip_whitespace(str, i);
+
+    // Check if starts with sys_
+    if( str.size() - i < 4 )
+        return false;
+    if( str.substr(i, 4) != "sys_" ){
+        return false;
+    }else{
+        i += 4;
+    }
+    // Get num
+    if( ! _parse_il_cst(arch, args, str, i)){
+        return false;
+    }else{
+        num = args[0];
+        idx = i;
+        return true;
+    }
+}
+
+
 bool _parse_il_reg_and_offset(Arch& arch, vector<cst_t>& args, string& str, int& idx){
     cst_t mult;
     // Get reg
@@ -548,6 +601,50 @@ bool _parse_il_function(Arch& arch, ILInstruction* instr, string& str){
     return false;
 }
 
+bool _parse_il_syscall_by_name(Arch& arch, ILInstruction* instr, string& str){
+    int idx = 0;
+    vector<cst_t> args;
+    vector<int> args_type;
+    string name;
+    if  (_parse_il_syscall_name(name, str, idx) &&
+         _parse_il_function_args(arch, args, args_type, str, idx) &&
+        _parse_end(str, idx))
+    {
+        
+        instr->syscall_name = name;
+        instr->args = args;
+        instr->args_type = args_type;
+        instr->type = ILInstructionType::SYSCALL;
+        return true;
+    }
+    return false;
+}
+
+bool _parse_il_syscall_by_num(Arch& arch, ILInstruction* instr, string& str){
+    int idx = 0;
+    vector<cst_t> args;
+    vector<int> args_type;
+    int num;
+    if  (_parse_il_syscall_num(arch, num, str, idx) &&
+         _parse_il_function_args(arch, args, args_type, str, idx) &&
+        _parse_end(str, idx))
+    {
+        
+        instr->syscall_num = num;
+        instr->args = args;
+        instr->args_type = args_type;
+        instr->type = ILInstructionType::SYSCALL;
+        return true;
+    }
+    return false;
+}
+
+bool _parse_il_syscall(Arch& arch, ILInstruction* instr, string& str){
+    // NUM before NAME otherwise the num is just parsed as a name string :) 
+    return  _parse_il_syscall_by_num(arch, instr, str) ||  
+            _parse_il_syscall_by_name(arch, instr, str);
+}
+
 bool _parse_il_instruction(Arch& arch, ILInstruction* instr, string& str){
     return  _parse_il_mov_cst(arch, instr, str) || 
             _parse_il_mov_reg(arch, instr, str) ||
@@ -565,7 +662,8 @@ bool _parse_il_instruction(Arch& arch, ILInstruction* instr, string& str){
             _parse_il_cst_store_cst(arch, instr, str) ||
             _parse_il_astore_cst(arch, instr, str) ||
             _parse_il_cst_astore_cst(arch, instr, str) ||
-            _parse_il_function(arch, instr, str);
+            _parse_il_function(arch, instr, str) ||
+            _parse_il_syscall(arch, instr, str);
 }
 
 
