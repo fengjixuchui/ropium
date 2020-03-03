@@ -299,6 +299,11 @@ namespace test{
 
             raw.push_back(RawGadget(string("\x21\x56\xF8\xC3", 4), 3)); // and [esi - 8], edx; ret
             raw.push_back(RawGadget(string("\x8D\x77\x10\xC3", 4), 4)); // lea esi, [edi + 16]; ret
+            
+            raw.push_back(RawGadget(string("\x89\xC8\xC3", 3), 5)); // mov eax, ecx; ret
+            raw.push_back(RawGadget(string("\x89\xC3\xC3", 3), 6)); // mov ebx, eax; ret
+            raw.push_back(RawGadget(string("\x89\x43\x08\xC3", 4), 7)); // mov [ebx + 8], eax; ret
+
             db.analyse_raw_gadgets(raw, arch);
 
             // Test adjust store on STORE type
@@ -328,6 +333,21 @@ namespace test{
             ropchain = sgraph2.get_ropchain(arch);
             nb += _assert_ropchain(ropchain, "Basic application of strategy rule failed");
 
+            // ANother adjust store on STORE mixed with src_transitivity
+            StrategyGraph sgraph3;
+            node_t n3 = sgraph3.new_node(GadgetType::STORE);
+            Node& node3 = sgraph3.nodes[n3];
+            node3.params[PARAM_STORE_DST_ADDR_REG].make_reg(X86_EAX);
+            node3.params[PARAM_STORE_DST_ADDR_OFFSET].make_cst(8, "cst_0");
+            node3.params[PARAM_STORE_SRC_REG].make_reg(X86_ECX);
+            // Apply strat
+            sgraph3.rule_adjust_store(n3, arch);
+            sgraph3.rule_generic_src_transitivity(2);
+
+            sgraph3.select_gadgets(db, nullptr, arch);
+            ropchain = sgraph3.get_ropchain(arch);
+            nb += _assert_ropchain(ropchain, "Basic application of strategy rules failed");
+
             delete arch;
             return nb;
         }
@@ -348,7 +368,7 @@ namespace test{
             vector<StrategyGraph*> graphs;
             ROPCompiler* comp = new ROPCompiler(arch, &db);
             vector<ILInstruction> instrs = comp->parse("0x1234()");
-            comp->il_to_strategy(graphs, instrs[0], ABI::X86_CDECL);
+            comp->il_to_strategy(graphs, instrs[0], NULL, ABI::X86_CDECL);
 
             // Apply strat
             graphs[0]->rule_mov_cst_pop(1, arch);
@@ -362,6 +382,63 @@ namespace test{
             */
             return nb;
         }
+        
+        // Buggy X64 syscall...
+        unsigned int test_x64_syscall(){
+            unsigned int nb = 0;
+            /*  DOESN'T WORK ANYMORE WITH NEW COMPILER MECANISM
+            
+            Arch* arch = new ArchX64();
+            GadgetDB db;
+            ROPChain* ropchain = nullptr;
+            
+            vector<RawGadget> raw;
+            raw.push_back(RawGadget(string("\x58\xC3", 2), 1)); // pop rax; ret
+            raw.push_back(RawGadget(string("\x5F\xC3", 2), 2)); // pop rdi; ret
+            raw.push_back(RawGadget(string("\x83\xC5\x20\x0F\x05", 5), 3)); // add ebp, 32; syscall
+            raw.push_back(RawGadget(string("\x5E\xC3", 2), 4)); // pop rsi; ret
+            raw.push_back(RawGadget(string("\x59xC3", 2), 5)); // pop rcx; ret
+            raw.push_back(RawGadget(string("\x41\x5F\xC3", 3), 6)); // pop r15; ret
+            raw.push_back(RawGadget(string("\x48\x89\xC2\x41\xFF\xD7", 6), 7)); // mov rdx, rax; call r15
+            db.analyse_raw_gadgets(raw, arch);
+            
+
+            // Test cst_pop on a function call strategy graph 
+            vector<StrategyGraph*> graphs;
+            ROPCompiler* comp = new ROPCompiler(arch, &db);
+            string query = "sys_11(1,2,3)";
+            vector<ILInstruction> instrs = comp->parse(query);
+            comp->il_to_strategy(graphs, instrs[0], nullptr, ABI::NONE, System::LINUX);
+
+            // Apply strat
+            graphs[0]->rule_mov_cst_pop(1, arch);
+            graphs[0]->rule_mov_cst_pop(2, arch);
+            // Adjust rdx 
+            graphs[0]->rule_generic_adjust_jmp(3, arch);
+            graphs[0]->rule_mov_cst_pop(7, arch);
+            graphs[0]->rule_generic_transitivity(3);
+            graphs[0]->rule_mov_cst_pop(10, arch);
+            // Adjust eax
+            graphs[0]->rule_mov_cst_pop(4, arch);
+
+            graphs[0]->select_gadgets(db, nullptr, arch);
+            ropchain = graphs[0]->get_ropchain(arch);
+            nb += _assert_ropchain(ropchain, "Applications of rules to get syscall ropchain failed");
+
+            for( auto g : graphs ){
+                delete g;
+            }
+            
+            delete arch;
+            delete comp;
+            
+            */
+
+            
+            
+            return nb;
+        }
+
     }
 }
 
@@ -383,6 +460,7 @@ void test_strategy(){
         total += test_generic_src_transitivity();
         total += test_adjust_store();
         total += test_cst_pop();
+        total += test_x64_syscall();
     }
 
     // Return res

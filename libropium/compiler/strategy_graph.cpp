@@ -645,8 +645,9 @@ bool StrategyGraph::compute_dfs_scheduling(){
                 (std::count(marked.begin(), marked.end(), node.id) != 0)){
             continue;
         }else{
-            if( ! _dfs_scheduling_explore(marked, node.id) )
+            if( ! _dfs_scheduling_explore(marked, node.id) ){
                 return false; // Cycle detected
+            }
         }
     }
     return true;
@@ -893,7 +894,7 @@ bool StrategyGraph::select_gadgets(GadgetDB& db, Constraint* constraint, Arch* a
         else
                 return false;
     }
-    
+
     // 1. Try all possibilities for parameters
     if( node.has_free_param() ){
         // Get possible gadgets
@@ -944,15 +945,15 @@ bool StrategyGraph::select_gadgets(GadgetDB& db, Constraint* constraint, Arch* a
 
         // Check strategy constraints 
         if( _check_strategy_constraints(node, arch)){
-            
+
             // Get matching gadgets
             const vector<Gadget*>& gadgets = _get_matching_gadgets(db, node.id);
-            
+
             // 2. Try all possible gadgets (or a subset)
             for( Gadget* gadget : gadgets ){
                 if( ! node.assign_gadget(gadget, arch, constraint))
                     continue;
-                
+
                 // Resolve params again (useful for special paddings that depend
                 // on regular parameters such as offsets, etc)
                 _resolve_all_params(node.id);
@@ -963,7 +964,7 @@ bool StrategyGraph::select_gadgets(GadgetDB& db, Constraint* constraint, Arch* a
 
                 // Prepare assertion for current parameter choice
                 node.apply_assertion();
-                
+
                 // Check assigned gadget constraints and global constraint
                 if( !_check_assigned_gadget_constraints(node, arch) || (constraint && !constraint->check(gadget, arch, &node.assertion))){
                     continue;
@@ -1055,13 +1056,14 @@ bool StrategyGraph::_do_scheduling(int interference_idx){
             }
             nodes[inter.end_node].interference_edges = saved_end_edges; // Restore interference edges
         }
-        
+
         return success;
     }
 }
 
 bool StrategyGraph::schedule_gadgets(){
     bool success = false;
+
     // Compute inteference points
     compute_interference_points();
     // Go through all interference points and try both possibilities
@@ -1161,6 +1163,7 @@ StrategyGraph* StrategyGraph::copy(){
     new_graph->nodes = nodes;
     // Copy name generator (to avoid create new names for 0 that colision with previous ones)
     new_graph->name_generator = name_generator;
+    new_graph->_history = _history;
     return new_graph;
 }
 
@@ -1221,6 +1224,8 @@ ostream& operator<<(ostream& os, Node& node){
 
 ostream& operator<<(ostream& os, StrategyGraph& graph){
     os << "STRATEGY GRAPH\n==============";
+    
+    os << "\n\t History: " << graph._history;
     
     os << "\n\tDFS strategy: "; 
     for( node_t n : graph.dfs_strategy ){

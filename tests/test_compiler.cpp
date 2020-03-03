@@ -153,6 +153,48 @@ namespace test{
             // Test src transitivity
             ropchain = comp.compile(" [ebx+8] =  ebp");
             nb += _assert_ropchain(ropchain, "Failed to find ropchain");
+            
+            // Test adjust store
+            ropchain = comp.compile(" [eax+8] =  ecx");
+            nb += _assert_ropchain(ropchain, "Failed to find ropchain");
+
+            return nb;
+        }
+        
+        unsigned int store_string(){
+            unsigned int nb = 0;
+            
+            ArchX86 arch;
+            GadgetDB db;
+            ROPCompiler comp = ROPCompiler(&arch, &db);
+            ROPChain* ropchain;
+            Constraint constr;
+            constr.bad_bytes.add_bad_byte(0xff);
+
+            // Available gadgets
+            vector<RawGadget> raw;
+            raw.push_back(RawGadget(string("\x89\xf9\xbb\x01\x00\x00\x00\xc3", 8), 1)); // mov ecx, edi; mov ebx, 1; ret
+            raw.push_back(RawGadget(string("\x89\xC8\xC3", 3), 2)); // mov eax, ecx; ret
+            raw.push_back(RawGadget(string("\x89\xC3\xC3", 3), 3)); // mov ebx, eax; ret
+            raw.push_back(RawGadget(string("\xb9\xad\xde\x00\x00\xc3", 6), 4)); // mov ecx, 0xdead; ret
+            raw.push_back(RawGadget(string("\x5f\x5e\x59\xc3", 4), 5)); // pop edi; pop esi; pop ecx; ret
+            raw.push_back(RawGadget(string("\x89\xE8\xFF\xE6", 4), 6)); // mov eax, ebp; jmp esi
+            raw.push_back(RawGadget(string("\x89\xF1\xFF\xE0", 4), 7)); // mov ecx, esi; jmp eax
+            raw.push_back(RawGadget(string("\x5A\x59\xC3", 3), 8)); // pop edx; pop ecx; ret
+            raw.push_back(RawGadget(string("\x8B\x40\x08\xC3", 4), 9)); // mov eax, [eax + 8]; ret
+            raw.push_back(RawGadget(string("\x8D\x4B\x08\xC3", 4), 10)); // lea ecx, [ebx + 8]; ret
+            raw.push_back(RawGadget(string("\x8D\x40\x20\xFF\xE1", 5), 11)); // lea eax, [eax + 32]; jmp ecx;
+            raw.push_back(RawGadget(string("\x89\x43\x08\xC3", 4), 12)); // mov [ebx + 8], eax; ret
+
+            db.analyse_raw_gadgets(raw, &arch);
+
+            // Test adjust store
+            ropchain = comp.compile(" [0x1234] =  'lala'");
+            nb += _assert_ropchain(ropchain, "Failed to find ropchain");
+            
+            ropchain = comp.compile(" [0x1234] =  'lalatotoo\\x00'");
+            nb += _assert_ropchain(ropchain, "Failed to find ropchain");
+
             return nb;
         }
         
@@ -252,6 +294,7 @@ namespace test{
             raw.push_back(RawGadget(string("\x48\x89\xef\xc3",4), 10)); // mov rdi, rbp; ret
             raw.push_back(RawGadget(string("\x48\x83\xC4\x18\xC3", 5), 11)); // add rsp, 24; ret
             raw.push_back(RawGadget(string("\x49\x89\xd1\xc3",4), 12)); // mov r9, rdx; ret
+            raw.push_back(RawGadget(string("\x48\x83\xC4\x10\xC3", 5), 13)); // add rsp, 16; ret
             db.analyse_raw_gadgets(raw, &arch);
 
             // X64 SYSTEM V
@@ -269,7 +312,7 @@ namespace test{
             
             ropchain = comp.compile(" 0x1234(rbp, 2, 3, 4, 5, 6, 7, 8, 9)", nullptr, ABI::X64_SYSTEM_V);
             nb += _assert_ropchain(ropchain, "Couldn't build ropchain to call function");
-            
+
             // X64 Microsoft
             ropchain = comp.compile(" 0x1234(42)", nullptr, ABI::X64_MS);
             nb += _assert_ropchain(ropchain, "Couldn't build ropchain to call function");
@@ -376,6 +419,7 @@ void test_compiler(){
     total += function_call_x64();
     total += syscall_x86();
     total += syscall_x64();
+    total += store_string();
     total += incorrect_match();
     // Return res
     cout << "\t" << total << "/" << total << green << "\t\tOK" << def << endl;

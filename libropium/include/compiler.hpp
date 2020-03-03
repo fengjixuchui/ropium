@@ -46,7 +46,8 @@ public:
     CompilerTask(Arch* arch);
     vector<StrategyGraph*> pending_strategies;
     void add_strategy(StrategyGraph* graph, int max_tries);
-    ROPChain* compile(Arch* arch, GadgetDB* db, Constraint* constraint=nullptr, int nb_tries=3000); // DEBUG 
+    ROPChain* compile(Arch* arch, GadgetDB* db, Constraint* constraint=nullptr, int nb_tries=3000);
+    void clear();
     ~CompilerTask();
 };
 
@@ -61,23 +62,36 @@ public:
 */
 
 class ROPCompiler{
+    ROPChain* _set_registers_permutation( vector<ILInstruction>& instr, vector<int>& permutation, 
+        Constraint* constraint, list<vector<int>>& failed_perms, bool& failed_on_first);
+    bool is_complex_instr(ILInstruction& instr, ABI abi);
 public:
     Arch* arch;
     GadgetDB* db;
     // Translate function calls into strategy graphs
     bool _x86_cdecl_to_strategy(StrategyGraph& graph, ILInstruction& instr);
     bool _x86_stdcall_to_strategy(StrategyGraph& graph, ILInstruction& instr);
-    bool _x64_system_v_to_strategy(StrategyGraph& graph, ILInstruction& instr);
-    bool _x64_ms_to_strategy(StrategyGraph& graph, ILInstruction& instr);
-    bool _x86_linux_syscall_to_strategy(StrategyGraph& graph, ILInstruction& instr);
-    bool _x64_linux_syscall_to_strategy(StrategyGraph& graph, ILInstruction& instr);
 
-    // Main API
-    ROPChain* process(vector<ILInstruction>& instructions, Constraint* constraint=nullptr, ABI abi = ABI::NONE, System sys=System::NONE);
-    vector<ILInstruction> parse(string program);
-    void il_to_strategy(vector<StrategyGraph*>& graphs, ILInstruction& instr, ABI abi = ABI::NONE, System sys=System::NONE);
+    // Compile wrappers for functions and syscalls that set multiple registers
+    ROPChain* _set_multiple_registers(vector<ILInstruction>& instr, Constraint* constraint);
+    ROPChain* _compile_x86_linux_syscall(ILInstruction& instr, Constraint* constraint);
+    ROPChain* _compile_x64_linux_syscall(ILInstruction& instr, Constraint* constraint);
+    ROPChain* _compile_x64_system_v_call(ILInstruction& instr, Constraint* constraint);
+    ROPChain* _compile_x64_ms_call(ILInstruction& instr, Constraint* constraint);
 
     ROPCompiler( Arch* arch, GadgetDB* db);
+
+    // Main API
+    // Take a list of instructions and compile all of them sequentially into a ropchain
+    ROPChain* process_simple(vector<ILInstruction>& instructions, Constraint* constraint=nullptr, ABI abi = ABI::NONE, System sys=System::NONE);
+    ROPChain* process_complex(vector<ILInstruction>& instructions, Constraint* constraint=nullptr, ABI abi = ABI::NONE, System sys=System::NONE);
+    // Transform complex instructions into simpler instructions that can be handled by "process()"
+    bool preprocess(vector<ILInstruction>& dst, vector<ILInstruction>& src, Constraint* constraint=nullptr);
+    // Parse a program into a vector of instructions
+    vector<ILInstruction> parse(string& program);
+    // Translate an IL instruction into one or several strategy graphs
+    void il_to_strategy(vector<StrategyGraph*>& graphs, ILInstruction& instr, Constraint* constraint = nullptr, ABI abi = ABI::NONE, System sys=System::NONE);
+    // Parse and process a program
     ROPChain* compile(string program, Constraint* constraint=nullptr, ABI abi=ABI::NONE, System sys=System::NONE);
 };
 

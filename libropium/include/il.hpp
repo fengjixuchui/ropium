@@ -35,11 +35,13 @@ enum class ILInstructionType{
     ASTORE_CST,     // mem(reg + offset) OP<- cst
     CST_STORE_CST,  // mem(offset) <- cst
     CST_ASTORE_CST,  // mem(offset) OP<- cst
+    CST_STORE_STRING, // mem(offset) <- string 
     // jump
     JMP,         // PC <- reg
     // Call functions
     FUNCTION,
-    SYSCALL
+    SYSCALL,
+    SINGLE_SYSCALL
 };
 
 /* IL - Instruction
@@ -70,8 +72,11 @@ public:
     ILInstructionType type;
     string syscall_name; // Used for SYSCALL
     int syscall_num; // Use for SYSCALL
+    string str; // Use for STORE_STRING
     vector<cst_t> args;
     vector<int> args_type; // Used for FUNCTION
+    ILInstruction(ILInstructionType type, vector<cst_t>* args=nullptr, vector<int>* args_type = nullptr, string syscall_name="",
+            int syscall_num = -1, string str="");
     ILInstruction(Arch& arch, string instr_str); // raises il_exception if instr_str is invalid
 };
 

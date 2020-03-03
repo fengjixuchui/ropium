@@ -46,7 +46,7 @@ keep_regs = []
 safe_mem = True
 abi = ABI.NONE
 system = OS.NONE
-start_msg = "\n" + str_bold("ROPium") + " - v3.0\n"
+start_msg = "\n" + str_bold("ROPium") + " - v3.1\n"
 
 # Commands
 CMD_HELP = "help"
@@ -251,7 +251,7 @@ def badbytes(args):
     if subcommand == "set":
         set_badbytes(args[1:])
     elif subcommand == "reset":
-        reset_bad_bytes(args[1:])
+        reset_badbytes(args[1:])
     else:
         raise ContextException(f"Unsupported action '{subcommand}'")
 
@@ -263,6 +263,8 @@ def str_to_byte(s):
             return int(s, 16)
         except:
             return None
+
+
 
 def set_badbytes(args):
     global bad_bytes
@@ -478,8 +480,12 @@ find_help += "\n\t [0x12345678] = ebx"
 find_help += "\n\t [0x12345678] = 0x42"
 find_help += "\n\t [0x12345678] &= ebx"
 find_help += "\n\t [0x12345678] &= 0x42"
+find_help += "\n\t [0x12345678] = '/bin/sh\x00'"
 find_help += "\n\t 0x08040120()"
 find_help += "\n\t 0x08040120(1, 2, 3, 4)"
+find_help += "\n\t sys_execve(0x1234, 0, 0) [syscall by name]"
+find_help += "\n\t sys_0xb(0x1234, 0, 0)    [syscall by num]"
+
 
 badbytes_help = str_main(str_bold("\n\t'badbytes' Command"))
 badbytes_help += str_special("\n\t(Set bad bytes to avoid in ropchains)")

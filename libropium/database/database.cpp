@@ -67,6 +67,7 @@ gadget_t GadgetDB::add(Gadget* gadget, Arch* arch){
         // MOV_REG
         else if( e->is_var() && !e->is_reg(reg) ){
             mov_reg.add(make_tuple(reg, e->reg()), gadget);
+            amov_cst.add(make_tuple(reg, e->reg(), (op_t)Op::ADD, 0), gadget);
         }
         // AMOV_CST
         else if( e->is_binop() && e->args[0]->is_cst() && e->args[1]->is_var() && 
@@ -159,7 +160,11 @@ int GadgetDB::analyse_raw_gadgets(vector<RawGadget>& raw_gadgets, Arch* arch){
                     throw symbolic_exception("symbolic engine returned null semantics");
                 }
             }catch(symbolic_exception& e){
-                //std::cout << "DEBUG ERROR WHILE EXECUTING GADGET: " << irblock->name << " --> " << e.what() << std::endl;
+                //std::cout << "DEBUG SYMBOLIC ERROR WHILE EXECUTING GADGET: " << irblock->name << " --> " << e.what() << std::endl;
+                    delete gadget; continue;
+                    delete irblock; irblock = nullptr;
+            }catch(expression_exception& e){
+                //std::cout << "DEBUG EXPRESSION ERROR WHILE EXECUTING GADGET: " << irblock->name << " --> " << e.what() << std::endl;
                     delete gadget; continue;
                     delete irblock; irblock = nullptr;
             }
@@ -251,6 +256,7 @@ int GadgetDB::analyse_raw_gadgets(vector<RawGadget>& raw_gadgets, Arch* arch){
             nb_success++;
         }
     }
+
     return nb_success;
 }
 

@@ -18,6 +18,12 @@ void ROPChain::add_gadget_address(cst_t value, string msg){
     items.push_back(ROPItem(ROPItemType::GADGET_ADDRESS, value, msg));
 }
 
+void ROPChain::add_chain(ROPChain& other){
+    for( ROPItem& item : other.items ){
+        items.push_back(item);
+    }
+}
+
 int ROPChain::len(){
     return items.size();
 }
@@ -91,6 +97,8 @@ void ROPChain::dump_raw(vector<uint8_t>& bytes){
         if( item.type == ROPItemType::GADGET ){
             append_value_to_bytes(bytes, item.addr, arch->octets);
         }else if( item.type == ROPItemType::PADDING ){
+            append_value_to_bytes(bytes, item.value, arch->octets);
+        }else if( item.type == ROPItemType::GADGET_ADDRESS ){
             append_value_to_bytes(bytes, item.value, arch->octets);
         }else{
             throw runtime_exception("ROPChain::print_raw() got unsupported item type");
